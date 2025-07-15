@@ -24,7 +24,7 @@ impl EmailClient {
         html_body: html_content,
         text_body: text_content,
        };
-       let builder = self.http_client.post(&url)
+       let _builder = self.http_client.post(&url)
             .header("X-Postmark-Server-Token", self.authorization_token.expose_secret())
             .json(&request_body)
             .send()
@@ -60,7 +60,7 @@ struct SendEmailRequest<'a>{
 #[cfg(test)]
 mod tests{
     use crate::domain::SubscriberEmail;
-    use crate::email_client::{self, EmailClient};
+    use crate::email_client:: EmailClient;
     use fake::faker::internet::en::SafeEmail;
     use fake::faker::lorem::en::{Paragraph,Sentence};
     use fake::{Fake,Faker};

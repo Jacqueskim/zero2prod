@@ -2,11 +2,6 @@
 set -x
 set -eo pipefail
 
-if ! [ -x "$(command -v psql)" ]; then
-    echo >&2 "Error: psql is not installed. Please install PostgreSQL client."
-    exit 1
-fi
-
 if ! [ -x "$(command -v sqlx)" ]; then
     echo >&2 "Error: sqlx is not installed. Please install sqlx."
     echo >&2 "Use:"

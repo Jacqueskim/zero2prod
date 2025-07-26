@@ -35,6 +35,8 @@ quickcheck="0.9.2"
 quickcheck_macros="0.9.1"
 serde_json = "1"
 rand = {version="0.8", features=["std_rng"]}
+thiserror="1"
+anyhow = "1"
 [dependencies.sqlx]
 version = "0.7"
 default-features =  false

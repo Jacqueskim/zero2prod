@@ -1,4 +1,4 @@
-use crate::routes::{health_check, subscribe, confirm,publish_newsletter};
+use crate::routes::{health_check, subscribe, confirm,publish_newsletter, login_form};
 use actix_web::dev::Server;
 use actix_web::{web, App, HttpServer};
 use sqlx::PgPool;
@@ -8,7 +8,9 @@ use crate::email_client::EmailClient;
 use crate::configuration::Settings;
 use sqlx::postgres::PgPoolOptions;
 use crate::configuration::DatabaseSettings;
-
+use crate::routes::home;
+use crate::routes::login;
+use secrecy::Secret;
 
 pub struct Application{
     port :u16,
@@ -28,7 +30,8 @@ impl Application{
     let address = format!("{}:{}", configuration.application.host, configuration.application.port);
     let listener = TcpListener::bind(address)?;
     let port = listener.local_addr().unwrap().port();
-    let server = run(listener, connection_pool,email_client, configuration.application.base_url)?;
+    let server = run(listener, connection_pool,email_client, configuration.application.base_url,
+    configuration.application.hmac_secret)?;
     Ok(Self {port, server})
 }
     pub fn port(&self)->u16{
@@ -45,6 +48,7 @@ pub fn run(
     connection:PgPool,
     email_client:EmailClient,
     base_url:String,
+    hmac_secret:Secret<String>,
 ) ->Result<Server, std::io::Error>{
     let connection = web::Data:: new(connection);
     let email_client = web::Data::new(email_client);
@@ -56,14 +60,21 @@ pub fn run(
             .route("/subscriptions", web::post().to(subscribe))
             .route("/subscriptions/confirm", web::get().to(confirm))
             .route("/newsletters", web::post().to(publish_newsletter))
+            .route("/", web::get().to(home)) // Add this line to include the home route
+            .route("/login", web::get().to(login_form))
+            .route("/login", web::post().to(login))
             .app_data(connection.clone())
             .app_data(email_client.clone())
             .app_data(base_url.clone())
+            .app_data(Data::new(hmac_secret.clone()))
     })
     .listen(listener)?
     .run();
     Ok(server)
 }
+
+#[derive(Clone)]
+pub struct HmacSecret(pub Secret<String>);
 pub fn get_connection_pool(
     configuration:&DatabaseSettings)->PgPool{
         PgPoolOptions::new().connect_lazy_with(configuration.with_db())

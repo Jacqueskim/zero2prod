@@ -11,6 +11,8 @@ use secrecy::Secret;
 use actix_web::error::InternalError;
 use secrecy::ExposeSecret;
 use crate::startup::HmacSecret;
+use actix_web::cookie::Cookie;
+use actix_web_flash_messages::FlashMessage;
 #[derive(serde::Deserialize)]
 pub struct FormData{
     username:String,
@@ -20,12 +22,12 @@ pub struct FormData{
     fields(username=tracing::field::Empty, user_id=tracing::field::Empty))]
 pub async fn login(form: web::Form<FormData>, pool: web::Data<PgPool>) 
     ->Result<HttpResponse,InternalError<LoginError>>{
-    let credentials = Credentials{
+    let credentials = credentials{
         username: form.0.username,
         password: form.0.password,
     };
     tracing::Span::current().record("username", &tracing::field::display(&credentials.username));
-    match validate_Credentials(credentials, &pool).await{
+    match validate_credentials(credentials, &pool).await{
         Ok(user_id) =>{
             tracing::Span::current().record("user_id", &tracing::field::display(&user_id));
             let response = HttpResponse::SeeOther()
@@ -51,8 +53,10 @@ pub async fn login(form: web::Form<FormData>, pool: web::Data<PgPool>)
                 mac.update(query_string.as_bytes());
                 mac.finalize().into_bytes()
             };
+            FlashMessage::error(e.to_string()).send();
             let response =HttpResponse::SeeOther()
-                .insert_header((LOCATION, format!("/login?{query_string}&tag={hmac_tag:x}")))
+                .insert_header((LOCATION, "/login"))
+                .cookie(Cookie::new("_flash", e.to_string()))
                 .finish();
             Err(InternalError::from_response(e, response).into())
             

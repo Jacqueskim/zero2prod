@@ -13,14 +13,16 @@ use secrecy::ExposeSecret;
 use crate::startup::HmacSecret;
 use actix_web::cookie::Cookie;
 use actix_web_flash_messages::FlashMessage;
+use actix_session::Session;
+use crate::session_state::TyepedSession;
 #[derive(serde::Deserialize)]
 pub struct FormData{
     username:String,
     password:Secret<String>,
 }
-#[tracing::instrument(skip(form,pool,secret),
+#[tracing::instrument(skip(form,pool,session),
     fields(username=tracing::field::Empty, user_id=tracing::field::Empty))]
-pub async fn login(form: web::Form<FormData>, pool: web::Data<PgPool>) 
+pub async fn login(form: web::Form<FormData>, pool: web::Data<PgPool>, session: Session) 
     ->Result<HttpResponse,InternalError<LoginError>>{
     let credentials = credentials{
         username: form.0.username,
@@ -33,7 +35,12 @@ pub async fn login(form: web::Form<FormData>, pool: web::Data<PgPool>)
             let response = HttpResponse::SeeOther()
                 .insert_header((LOCATION, "/"))
                 .finish();
-            Ok(response)
+            session.renew();
+            session.insert("user_id",user_id)
+                .map_err(|e| login_redirect(LoginError::UnexpectedError(e.into())))?;
+            Ok(HttpResponse::SeeOther()
+                .insert_header((LOCATION, "/admin/dashboard"))
+                .finish())
         },
         Err(e) =>{
             let e  = match e{
@@ -42,6 +49,7 @@ pub async fn login(form: web::Form<FormData>, pool: web::Data<PgPool>)
                 LoginError::UnexpectedError(e.into())
                 },
             };
+            Err(login_redirect(e))
             let query_string = format!(
                 "error={}",
                 urlencoding::Encoded::new(e.to_string())
@@ -94,4 +102,12 @@ impl ResponseError for LoginError{
     fn status_code(&self)->StatusCode{
         StatusCode::SEE_OTHER
     }
+}
+
+fn login_redirect(e: LoginError) ->InternalError<LoginError> {
+    FlashMessage::error(e.to_string()).send();
+    let response = HttpResponse::SeeOther()
+        .insert_header((LOCATION, "/login"))
+        .finish();
+    InternalError::from_response(e, response)
 }

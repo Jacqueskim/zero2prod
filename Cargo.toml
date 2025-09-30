@@ -14,6 +14,8 @@ path = "src/main.rs"
 name = "zero2prod"
 
 [dependencies]
+actix-session={version="0.7", features=["redis-rs-tls-session"]}
+uuid={version="1", features=["v4", "serde"]}
 actix-web-flash-messages= {version="0,4", features=["cookies"]}
 config = "0.13"
 urlencoding= "2"

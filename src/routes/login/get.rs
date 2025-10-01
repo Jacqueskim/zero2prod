@@ -13,7 +13,7 @@ pub struct QueryParams{
 pub async fn login_form(query: Option<web::Query<QueryParams>>,
     secret: web::Data<HmacSecret>) -> HttpResponse{
     let error_html = String::new();
-    for m in flash_messages.iter().filter(|m| m.level() == Level::Error){
+    for m in flash_messages.iter(){
         writeln!(error_html, "<p><i>{}</i></p>", m.content()).unwrap();
     }
 

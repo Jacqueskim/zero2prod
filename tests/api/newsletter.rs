@@ -21,18 +21,11 @@ async fn newletters_are_not_delivered_to_unconfirmed_subscribers(){
         .mount(&app.email_server)
         .await;
 
-    let newsletter_request_body = serde_json::json!({
-        "title": "Newsletter title",
-        "content": {
-            "text": "Newsletter body as plain text",
-            "html": "<p>Newsletter body as HTML </p>",
-        },
-        "idempotency_key": Uuid::new_v4().to_string(),
-    });
-
-    let response = app.post_newsletters(newsletter_request_body).await;
-
-    assert_eq!(response.status().as_u16(),200);
+   aassert!(html_page.contains(
+        "<p><i>The newsletter issue has been accepted - \
+        emails will go out shortly.</i></p>"
+   ));
+   app.dispatch_all_pending_emails().await;
 
 }
 
@@ -87,17 +80,11 @@ async fn newsletters_are_delivered_to_confirmed_subscribers(){
         .mount(&app.email_server)
         .await;
 
-    let newsletter_request_body = serde_json::json!({
-        "title":"Newsletter title",
-        "content":{
-            "text": "Newsletter body as plain text",
-            "html": "<p>Newsletter body as HTML </p>",
-        },
-        "idempotency_key": Uuid::new_v4().to_string(),
-    });
-    let response = app.post_newsletters(newsletter_request_body).await;
-
-    assert_eq!(response.status().as_u16(), 200);
+    assert!(html_page.contains(
+        "<p><i>The newsletter issue has been accepted - \
+        emails will go out shortly.</i></p>"
+    ));
+    app.dispatch_all_pending_emails().await;
 }
 
 #[tokio::test]
@@ -212,25 +199,17 @@ async fn newsletter_creation_is_idempotent(){
         .mount(&app.email_server)
         .await;
 
-    let newsletter_request_body = serde_json::json!({
-        "title":"Newsletter title",
-        "text_content": "Newsletter body as plain text",
-        "html_content": "<p>Newsletter body as HTML </p>",
-        "idempotency_key": Uuid::new_v4().to_string(),
-    });
-    let response = app.post_publish_newsletter(&newsletter_request_body).await;
-    assert_is_redirect_to(&response, "/admin/newsletters");
-
-    let html_page = app.get_published_newsletter(&newsletter_request_body).await;
+    let html_page = app.get_publish_newsletter_html().await;
     assert!(html_page.contains(
-        "<p><i>The newsletter issue has been published!</i></p>"
+        "<p><i>The newsletter issue has been accepted - \
+        emails will go out shortly.</i></p>"
     ));
-    let response = app.post_publish_newsletter(&newsletter_request_body).await;
-    assert_is_redirect_to(&response, "/admin/newsletters");
-    let html_page = app.get_published_newsletter(&newsletter_request_body).await;
+    let html_page = app.get_publish_newsletter_html().await;
     assert!(html_page.contains(
-        "<p><i>The newsletter issue has been published!</i></p>"
+        "<p><i>The newsletter issue has been accepted - \
+        emails will go out shortly.</i></p>"
     ));
+    app.dispatch_all_pending_emails().await;
 }
 
 #[tokio::test]
@@ -259,6 +238,7 @@ async fn concurrent_form_submission_is_handled_gracefully(){
 
     assert_eq!(response1.status(), response2.status());
     assert_eq!(response1.text().await.unwrap(), response2.text().await.unwrap());
+    app.dispatch_all_pending_emails().await;
 }
 
 fn when_sending_an_email() ->MockBuilder{
